@@ -25,6 +25,18 @@ export const STEPS = [
   { id: 'public_qa', kind: 'public_qa', remote: true },
 ];
 
+export const THEME_STEPS = [
+  { id: 'reference', prompt: '01-reference/页面爬取.md', kind: 'reference' },
+  { id: 'theme_local', prompt: 'prompts/theme-only/theme.md', kind: 'theme_local', localPrompt: true },
+  { id: 'local_qa', prompt: 'prompts/theme-only/local-qa.md', kind: 'local_qa', localPrompt: true },
+];
+
+export function stepsForMode(mode) {
+  if (mode === 'theme-only') return THEME_STEPS;
+  if (mode === 'full-store') return STEPS;
+  throw new Error(`Unsupported mode: ${mode}`);
+}
+
 export function shouldRun(step, facts = {}) {
   if (step.when === 'content') return Array.isArray(facts.contentPaths) && facts.contentPaths.length > 0;
   if (step.when === 'home') return facts.needsHomeFix === true;

@@ -6,6 +6,7 @@
   "scripts": {
     "setup": "node cli.mjs setup",
     "run": "node cli.mjs run",
+    "plan": "node cli.mjs plan",
     "resume": "node cli.mjs resume",
     "status": "node cli.mjs status",
     "test": "node --test",

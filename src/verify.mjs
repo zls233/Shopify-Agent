@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { relative } from 'node:path';
 import { inside, readJson } from './util.mjs';
 import { command, hasCollection, listThemes, readStore } from './shopify.mjs';
@@ -57,6 +57,33 @@ function referenceCheck(project, source) {
   requireFile(project, 'site-reference-summary.md');
 }
 
+export function verifyLocalStart(project, source, from) {
+  if (from === 'theme_local') {
+    if (existsSync(inside(project, 'manifest.json'))) return referenceCheck(project, source);
+    const summary = readFileSync(requireFile(project, 'site-reference-summary.md'), 'utf8');
+    if (!summary.includes(new URL(source).hostname)) throw new Error('Existing reference summary does not identify the requested source website.');
+    if (!/product/i.test(summary) || !/collection/i.test(summary)) throw new Error('External reference summary must identify product and collection pages.');
+    const screenshots = [...summary.matchAll(/\(([^)]+\.(?:png|jpe?g|webp))\)/gi)].map(match => match[1]);
+    if (screenshots.length < 2) throw new Error('External reference summary needs desktop and mobile screenshot links.');
+    if (!/desktop[^\n]*\([^)]+\.(?:png|jpe?g|webp)\)/i.test(summary) || !/mobile[^\n]*\([^)]+\.(?:png|jpe?g|webp)\)/i.test(summary)) throw new Error('External reference summary must label desktop and mobile screenshots.');
+    screenshots.forEach(path => requireFile(project, path));
+    return;
+  }
+  if (from !== 'local_qa') throw new Error(`Unsupported theme-only starting step: ${from}`);
+  requireFile(project, 'theme/layout/theme.liquid');
+  requireFile(project, 'theme/templates/index.json');
+  const summary = readFileSync(requireFile(project, 'site-reference-summary.md'), 'utf8');
+  if (!summary.includes(new URL(source).hostname)) throw new Error('Existing reference summary does not identify the requested source website.');
+}
+
+function checkThemeJson(project) {
+  for (const folder of ['theme/templates', 'theme/sections', 'theme/config']) {
+    const path = inside(project, folder);
+    if (!existsSync(path)) continue;
+    for (const name of readdirSync(path).filter(item => item.endsWith('.json'))) JSON.parse(readFileSync(inside(project, `${folder}/${name}`), 'utf8'));
+  }
+}
+
 function visualCheck(project, result) {
   const screenshots = result.artifacts.filter(path => /\.(png|jpe?g|webp)$/i.test(path));
   if (screenshots.length < 2) throw new Error('Visual step requires desktop and mobile screenshots.');
@@ -112,6 +139,17 @@ export async function verifyStep(step, result, context, deps = {}) {
     const available = await themes(store, { bin: shopifyBin, cwd: projectDir });
     if (!available.some(theme => theme.id === id && theme.role === 'unpublished')) throw new Error('Draft Theme is not an unpublished theme in the bound store.');
     await run(shopifyBin, ['theme', 'check', '--path', 'theme'], { cwd: projectDir });
+  }
+  if (step.kind === 'theme_local' || step.kind === 'local_qa') {
+    requireFile(projectDir, 'theme/layout/theme.liquid');
+    requireFile(projectDir, 'theme/templates/index.json');
+    checkThemeJson(projectDir);
+    if (existsSync(inside(projectDir, 'theme/assets/theme.js'))) await run('node', ['--check', 'theme/assets/theme.js'], { cwd: projectDir });
+    await run(shopifyBin, ['theme', 'check', '--path', 'theme'], { cwd: projectDir });
+  }
+  if (step.kind === 'local_qa') {
+    const report = readFileSync(requireFile(projectDir, 'agent-evidence/local_qa.md'), 'utf8');
+    if (!/未验证|待验证|unverified|pending/i.test(report)) throw new Error('Local QA must explicitly list store-dependent unverified checks.');
   }
   if (step.kind === 'visual') visualCheck(projectDir, result);
   if (step.kind === 'discount') {

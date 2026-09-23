@@ -10,7 +10,7 @@ function redact(value) {
   return text;
 }
 
-export async function runCodex({ bin = 'codex', cwd, prompt, schemaPath, outputPath, eventsPath, threadId, readOnly = false }) {
+export async function runCodex({ bin = 'codex', cwd, prompt, schemaPath, outputPath, eventsPath, threadId, readOnly = false, env = process.env }) {
   mkdirSync(dirname(outputPath), { recursive: true });
   const args = threadId
     ? ['exec', 'resume', '-c', 'approval_policy="never"', '-c', 'sandbox_workspace_write.network_access=true', '--json', '--output-schema', schemaPath, '-o', outputPath, threadId, '-']
@@ -20,7 +20,7 @@ export async function runCodex({ bin = 'codex', cwd, prompt, schemaPath, outputP
   let turnComplete = false;
   let streamBuffer = '';
   let stderr = '';
-  const child = spawn(bin, args, { cwd, stdio: ['pipe', 'pipe', 'pipe'], env: process.env });
+  const child = spawn(bin, args, { cwd, stdio: ['pipe', 'pipe', 'pipe'], env });
   child.stdin.end(prompt);
   child.stdout.on('data', chunk => {
     streamBuffer += chunk.toString('utf8');
