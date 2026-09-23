@@ -1,0 +1,28 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "status": { "type": "string", "enum": ["completed", "blocked"] },
+    "summary": { "type": "string" },
+    "artifacts": { "type": "array", "items": { "type": "string" } },
+    "blockers": { "type": "array", "items": { "type": "string" } },
+    "facts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sourceBrand": { "type": "string" },
+        "draftThemeId": { "type": "string" },
+        "csvPath": { "type": "string" },
+        "contentPaths": { "type": "array", "items": { "type": "string" } },
+        "needsHomeFix": { "type": "boolean" },
+        "needsProductFix": { "type": "boolean" },
+        "needsFooterFix": { "type": "boolean" },
+        "needsStickyHeader": { "type": "boolean" },
+        "blockingIssues": { "type": "array", "items": { "type": "string" } },
+        "publicPaths": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["sourceBrand", "draftThemeId", "csvPath", "contentPaths", "needsHomeFix", "needsProductFix", "needsFooterFix", "needsStickyHeader", "blockingIssues", "publicPaths"]
+    }
+  },
+  "required": ["status", "summary", "artifacts", "blockers", "facts"]
+}

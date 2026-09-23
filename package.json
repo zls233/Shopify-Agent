@@ -1,0 +1,14 @@
+{
+  "name": "shopify-agent",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "setup": "node cli.mjs setup",
+    "run": "node cli.mjs run",
+    "resume": "node cli.mjs resume",
+    "status": "node cli.mjs status",
+    "test": "node --test",
+    "check": "node --check cli.mjs && node --check src/runner.mjs && node --check src/shopify.mjs && node --check src/codex.mjs && node --check src/steps.mjs && node --check src/verify.mjs"
+  }
+}
