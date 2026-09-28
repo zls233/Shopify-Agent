@@ -217,18 +217,25 @@ test('CLI invokes Codex for a selected local step and persists the result', () =
     const codexBin = join(f.root, 'fake-codex.mjs');
     const shopifyBin = join(f.root, 'fake-shopify.sh');
     writeFileSync(codexBin, `#!/usr/bin/env node
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync } from 'node:fs';
+import { createInterface } from 'node:readline';
 import { join } from 'node:path';
 const args = process.argv.slice(2);
-const output = args[args.indexOf('-o') + 1];
-const prompt = readFileSync(0, 'utf8');
-if (!prompt.includes('STEP local_qa')) process.exit(2);
-mkdirSync(join(process.cwd(), 'agent-evidence'), { recursive: true });
-writeFileSync(join(process.cwd(), 'agent-evidence/local_qa.md'), 'Static checks passed. Pending Shopify preview and checkout.\\n');
+if (args[0] !== 'app-server' || args[1] !== '--listen' || args[2] !== 'stdio://') process.exit(2);
 const facts = { sourceBrand: '', draftThemeId: '', csvPath: '', contentPaths: [], needsHomeFix: false, needsProductFix: false, needsFooterFix: false, needsStickyHeader: false, blockingIssues: [], publicPaths: [] };
-writeFileSync(output, JSON.stringify({ status: 'completed', summary: 'local QA', artifacts: ['agent-evidence/local_qa.md'], blockers: [], facts }));
-process.stdout.write(JSON.stringify({ type: 'thread.started', thread_id: 'cli-smoke-thread' }) + '\\n');
-process.stdout.write(JSON.stringify({ type: 'turn.completed' }) + '\\n');
+const reply = value => process.stdout.write(JSON.stringify(value) + '\\n');
+for await (const line of createInterface({ input: process.stdin })) {
+  const message = JSON.parse(line);
+  if (message.method === 'initialize') reply({ id: message.id, result: {} });
+  if (message.method === 'thread/start') reply({ id: message.id, result: { thread: { id: 'cli-smoke-thread' } } });
+  if (message.method === 'turn/start') {
+    if (!message.params.input[0].text.includes('STEP local_qa')) process.exit(2);
+    mkdirSync(join(process.cwd(), 'agent-evidence'), { recursive: true });
+    writeFileSync(join(process.cwd(), 'agent-evidence/local_qa.md'), 'Static checks passed. Pending Shopify preview and checkout.\\n');
+    reply({ id: message.id, result: { turn: { id: 'cli-smoke-turn' } } });
+    reply({ method: 'turn/completed', params: { threadId: 'cli-smoke-thread', turn: { id: 'cli-smoke-turn', status: 'completed', items: [{ type: 'agentMessage', phase: 'final_answer', text: JSON.stringify({ status: 'completed', summary: 'local QA', artifacts: ['agent-evidence/local_qa.md'], blockers: [], facts }) }] } } });
+  }
+}
 `);
     writeFileSync(shopifyBin, '#!/bin/sh\nexit 0\n');
     chmodSync(codexBin, 0o755);

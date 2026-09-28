@@ -1,6 +1,6 @@
 # Shopify Agent
 
-输入一个原站 URL，让 CLI 按步骤调用 Codex。支持两种范围：`theme-only` 在没有店铺时采集参考并制作本地主题；`full-store` 按 [Shopify-Prompts](../Shopify-Prompts/README.md) 的步骤建立专用 Shopify 店铺。实际采集、主题实现、商品写入及浏览器检查仍由各步骤的 Codex 会话完成。
+输入一个原站 URL，让 CLI 通过本机 Codex app-server 按步骤运行会话。支持两种范围：`theme-only` 在没有店铺时采集参考并制作本地主题；`full-store` 按 [Shopify-Prompts](../Shopify-Prompts/README.md) 的步骤建立专用 Shopify 店铺。实际采集、主题实现、商品写入及浏览器检查仍由各步骤的 Codex 会话完成。
 
 ## 无店铺主题模式
 
@@ -11,7 +11,7 @@ npm run run -- https://theordinary.com/en-us
 npm run status -- --verbose
 ```
 
-目标目录应为空。系统先运行 `Shopify-Prompts/01-reference/页面爬取.md`，然后依次运行本仓库的 `prompts/theme-only/theme.md` 与 `prompts/theme-only/local-qa.md`。每步都通过 `codex exec` 执行并保存证据；本模式不要求店铺或 Shopify 凭据，也不会调用 Admin、上传或发布主题。完成状态是 `completed_local`：Theme Check、主题 JSON 和 JavaScript 可以在本地检查，Shopify 实际渲染、真实商品、购物袋和视觉预览仍需店铺验证。
+目标目录应为空。系统先运行 `Shopify-Prompts/01-reference/页面爬取.md`，然后依次运行本仓库的 `prompts/theme-only/theme.md` 与 `prompts/theme-only/local-qa.md`。每步都通过本机 `codex app-server --listen stdio://` 执行并保存证据；本模式不要求店铺或 Shopify 凭据，也不会调用 Admin、上传或发布主题。完成状态是 `completed_local`：Theme Check、主题 JSON 和 JavaScript 可以在本地检查，Shopify 实际渲染、真实商品、购物袋和视觉预览仍需店铺验证。
 
 接管已有主题时，不复制模板或覆盖已有文件：
 
@@ -27,7 +27,7 @@ npm run run -- --from local_qa https://theordinary.com/en-us
 
 ## 完整建店模式准备
 
-- Node.js 20+、Codex CLI、Shopify CLI、Playwright 所需浏览器，以及已登录目标店铺 Admin 的 SunBrowser。
+- Node.js 20+、支持 `codex app-server` 的 Codex CLI、Shopify CLI、Playwright 所需浏览器，以及当前操作者自己的 Shopify Partners 账号。先通过 Shopify Partners 为目标店铺申请或批准开发访问，再使用 Shopify CLI/Admin GraphQL；只有用户明确指定时才准备 SunBrowser。
 - 一个只供本项目使用、商品数为零且商家地址完整的 Shopify 店铺。准备 Theme Access token，并用 Shopify CLI 授权具有建站权限的 Admin App。Theme Access 与 Admin 授权是两条独立通道。
 - 将 `.env.example` 复制为 `.env.local`，填入 `SHOPIFY_CLI_THEME_TOKEN`；凭据不会写入项目报告。Codex CLI 可复用本机已有登录。
 - 运行 `setup` 代表允许这个专用店铺在完整 QA 通过后自动发布主题并开放访问。当前实现不处理付款、协议确认、登录、2FA 或 CAPTCHA；遇到这些步骤会暂停。
@@ -44,13 +44,13 @@ npm run status
 npm run resume
 ```
 
-`full-store` 是默认模式。`--project`、`--prompts`、`--template` 可省略；默认分别位于本仓库的 `projects/<store>`、相邻的 `Shopify-Prompts` 和相邻的 `Shopify-Template`。目标项目目录必须为空。`setup` 只读核对店铺、Admin App、Theme Access、商家地址及 SunBrowser 会话；`run` 才开始建立项目和远端资源。项目及原站在首次运行后固定，换店铺或换原站应使用新的 Agent 项目。
+`full-store` 是默认模式。`--project`、`--prompts`、`--template` 可省略；默认分别位于本仓库的 `projects/<store>`、相邻的 `Shopify-Prompts` 和相邻的 `Shopify-Template`。目标项目目录必须为空。`setup` 只读核对店铺、Shopify Partners/CLI 授权、Admin App、Theme Access 和商家地址；`run` 才开始建立项目和远端资源。项目及原站在首次运行后固定，换店铺或换原站应使用新的 Agent 项目。
 
 ## 执行与恢复
 
 流程依次运行项目初始化、授权、原站参考、商品抓取和清洗、导入、分类和内容页面、主题复刻、页面精调、定制、QA、上线检查、主题发布、开放访问及公开站点检查。内容页面、页面专项修复和粘性顶栏依据采集证据执行；全店四折、功能削减、Cookie 固定执行，独立 LOGO Prompt 不执行。
 
-每步使用 `codex exec --json --output-schema`，将会话 ID、Prompt 哈希、结果和错误保存在忽略的 `.shopify-agent/`。生成的 Shopify 项目拥有独立 Git 仓库。失败时最多自动修复三轮；认证、权限、原站限流和其他外部阻塞会暂停。解决问题后运行 `npm run resume`，已验收步骤不会重做，远端写入前会再次核对店铺与 App 身份。
+每步启动本机 `codex app-server --listen stdio://`，通过 `thread/start` 或 `thread/resume` 和 `turn/start` 发送提示词，使用 JSON Schema 约束最终结果。会话 ID、Prompt 哈希、结果和协议事件保存在忽略的 `.shopify-agent/`。既有 `codex exec` thread ID 保留，未完成步骤会通过 app-server 尝试恢复原会话；已验收步骤不会重做。生成的 Shopify 项目拥有独立 Git 仓库。失败时最多自动修复三轮；认证、权限、原站限流和其他外部阻塞会暂停。解决问题后运行 `npm run resume`，远端写入前会再次核对店铺与 App 身份。app-server 若要求客户端无法处理的交互，步骤会暂停，不会自动批准。
 
 `npm run plan` 显示当前模式的步骤、提示词路径和远端标记；`npm run status -- --verbose` 额外显示每步的会话 ID、提示词哈希、结果和事件路径。`run -- --from <step> <URL>` 只允许从已有可靠前置状态开始；完整建店模式不能在新项目中跳过前面的远端步骤。
 
@@ -86,10 +86,22 @@ npm run resume
 请检查当前 Shopify Agent 绑定项目的 verbose status 和最近的错误，确认暂停原因及可继续的步骤。阻塞条件解决后运行 npm run resume，保留原有状态和已验收产物；结束后报告本次实际运行的步骤、结果和仍未解决的问题。不要重新 setup 或将已有成果重复计为本次执行。
 ```
 
+### 4.1 先确认 Codex app-server 可用
+
+```text
+请先诊断并修复 Shopify Agent 调用 codex app-server 的问题，暂不运行 npm run resume，也不操作 Shopify 店铺。先检查 Agent 和已绑定项目的 Git 状态，运行 npm run status -- --verbose 与 npm run plan，保留已有未提交文件和 .shopify-agent/ 的会话、状态、事件记录。
+
+按顺序检查 codex 命令和版本、当前 CLI 使用的模型与 model_provider、该 provider 的 base_url 和认证方式、网络或代理环境，以及失败步骤的协议事件日志。只显示非敏感配置项和密钥是否存在；不要输出、复制或写入令牌，不要改动全局认证、退出登录或切换账号。区分 TLS/连接失败、429 限流、401 认证失败、模型不支持的 400，以及不影响模型响应的插件警告；不要仅凭 curl 能握手或 Codex 桌面应用可用就声称 app-server 的完整模型回合可用。
+
+先用只读、临时的新会话执行最短的 app-server 结构化探针，核对 initialize、thread/start、turn/start 和 turn/completed。必要时用单次进程的模型/provider 覆盖定位配置问题；找到有效配置后，优先做最小且可回退的修复，再用默认配置重测。不要把中转地址、密钥或某个模型硬编码进项目。按当前任务的测试授权范围执行验证。
+
+只有新会话和结构化探针均成功，才报告 app-server 模型回合已可用；旧暂停 thread 能否继续须单独验证，不要清空 threadId、重做 setup 或用 --from 跳过步骤。若探针仍失败，保持暂停，记录具体错误、已尝试的安全检查和下一步；不要盲目连续重试 429。报告本次实际改动、验证结果及尚未验证的恢复步骤。
+```
+
 ### 5. 完整建店并在验收通过后上线
 
 ```text
-请使用 Shopify Agent 的 full-store 模式，以 <原站 URL> 为参考，为专用空店铺 <店铺域名.myshopify.com> 在空目录 <新项目绝对路径> 建站。先核对店铺身份、Admin App 授权、Theme Access、商家地址和已登录的 SunBrowser，执行 setup 与 plan 后按顺序运行提示词，并逐步核对产物和状态。我授权在全部 QA 门槛通过后自动发布主题并开放访问；如果认证、权限或人工验证阻塞，请暂停并报告具体原因，不要声称已上线。
+请使用 Shopify Agent 的 full-store 模式，以 <原站 URL> 为参考，为专用空店铺 <店铺域名.myshopify.com> 在空目录 <新项目绝对路径> 建站。先通过当前操作者的 Shopify Partners 账号申请或确认目标店铺开发权限，再核对店铺身份、Admin App 授权、Theme Access 和商家地址，执行 setup 与 plan 后按顺序运行提示词，并逐步核对产物和状态。只有我明确指定时才使用 SunBrowser。我授权在全部 QA 门槛通过后自动发布主题并开放访问；如果认证、权限或人工验证阻塞，请暂停并报告具体原因，不要声称已上线。
 ```
 
 ## 验证
@@ -99,4 +111,4 @@ npm run check
 npm test
 ```
 
-测试用模拟 Codex 与 Shopify 响应覆盖步骤顺序、条件跳过、断点续跑、无店铺边界、既有项目接管和上线门槛；还通过假 Codex 可执行文件验证 CLI 子进程调用与状态持久化。真实店铺端到端运行仍需专用测试店铺。
+已有测试用模拟 Codex 与 Shopify 响应覆盖步骤顺序、条件跳过、断点续跑、无店铺边界、既有项目接管和上线门槛；CLI 子进程模拟已按 app-server 协议更新。真实 app-server 回合仍须与模拟结果分开报告；真实店铺端到端运行仍需专用测试店铺。
