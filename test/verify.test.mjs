@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { chmodSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { inspectCsv } from '../src/verify.mjs';
-import { parseStore, parseThemes, publicProbe } from '../src/shopify.mjs';
+import { listThemes, parseStore, parseThemes, publicProbe } from '../src/shopify.mjs';
 
 test('CSV validator handles multiline fields and counts unique product handles', () => {
   const root = mkdtempSync(join(tmpdir(), 'shopify-agent-csv-'));
@@ -38,4 +38,20 @@ test('public probe rejects password pages and checks discovered key links', asyn
   assert.equal(seen.length, 4);
   await assert.rejects(() => publicProbe('test.myshopify.com', [], async url => ({ ok: true, status: 200, url, text: async () => '<main>ok</main>' })), /no products route/);
   await assert.rejects(() => publicProbe('test.myshopify.com', [], async url => ({ ok: true, status: 200, url: `${url}password`, text: async () => '' })));
+});
+
+
+test('theme listing uses the current Partner CLI session without a Theme Access token', { skip: process.platform === 'win32' }, async () => {
+  const root = mkdtempSync(join(tmpdir(), 'shopify-agent-partner-'));
+  const bin = join(root, 'shopify');
+  const previous = process.env.SHOPIFY_CLI_THEME_TOKEN;
+  delete process.env.SHOPIFY_CLI_THEME_TOKEN;
+  try {
+    writeFileSync(bin, '#!/bin/sh\nprintf \'%s\\n\' \'{"themes":[{"id":42,"role":"unpublished"}]}\'\n');
+    chmodSync(bin, 0o755);
+    assert.deepEqual(await listThemes('test.myshopify.com', { bin, cwd: root }), [{ id: '42', role: 'unpublished', name: '' }]);
+  } finally {
+    if (previous !== undefined) process.env.SHOPIFY_CLI_THEME_TOKEN = previous;
+    rmSync(root, { recursive: true, force: true });
+  }
 });
