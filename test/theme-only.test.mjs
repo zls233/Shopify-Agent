@@ -54,8 +54,6 @@ async function runnerFixture(f) {
 
 test('theme-only runs prompts in order without store access and records provenance', async () => {
   const f = fixture();
-  const previousToken = process.env.SHOPIFY_CLI_THEME_TOKEN;
-  process.env.SHOPIFY_CLI_THEME_TOKEN = 'test-secret-value';
   try {
     const runner = await runnerFixture(f);
     const calls = [], checks = [];
@@ -96,8 +94,6 @@ test('theme-only runs prompts in order without store access and records provenan
     await runner.run('https://example.com/', deps);
     assert.equal(calls.length, 3);
   } finally {
-    if (previousToken === undefined) delete process.env.SHOPIFY_CLI_THEME_TOKEN;
-    else process.env.SHOPIFY_CLI_THEME_TOKEN = previousToken;
     rmSync(f.root, { recursive: true, force: true });
   }
 });
