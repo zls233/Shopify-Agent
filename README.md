@@ -28,8 +28,8 @@ npm run run -- --from local_qa https://theordinary.com/en-us
 ## 完整建店模式准备
 
 - Node.js 20+、支持 `codex app-server` 的 Codex CLI、Shopify CLI、Playwright 所需浏览器，以及当前操作者自己的 Shopify Partners 账号。先通过 Shopify Partners 为目标店铺申请或批准开发访问，再使用 Shopify CLI/Admin GraphQL；只有用户明确指定时才准备 SunBrowser。
-- 一个只供本项目使用、商品数为零且商家地址完整的 Shopify 店铺。准备 Theme Access token，并用 Shopify CLI 授权具有建站权限的 Admin App。Theme Access 与 Admin 授权是两条独立通道。
-- 将 `.env.example` 复制为 `.env.local`，填入 `SHOPIFY_CLI_THEME_TOKEN`；凭据不会写入项目报告。Codex CLI 可复用本机已有登录。
+- 一个只供本项目使用、商品数为零且商家地址完整的 Shopify 店铺。确认 Partner 账户已获目标店铺的 Themes 权限，并单独完成 Admin GraphQL 所需的 CLI store auth / App 授权。
+- 如需项目配置，可将 `.env.example` 复制为 `.env.local`。主题开发直接复用当前 Partner 账户的 Shopify CLI 登录态，不需要额外的主题令牌。Codex CLI 可复用本机已有登录。
 - 运行 `setup` 代表允许这个专用店铺在完整 QA 通过后自动发布主题并开放访问。当前实现不处理付款、协议确认、登录、2FA 或 CAPTCHA；遇到这些步骤会暂停。
 
 ```bash
@@ -44,7 +44,7 @@ npm run status
 npm run resume
 ```
 
-`full-store` 是默认模式。`--project`、`--prompts`、`--template` 可省略；默认分别位于本仓库的 `projects/<store>`、相邻的 `Shopify-Prompts` 和相邻的 `Shopify-Template`。目标项目目录必须为空。`setup` 只读核对店铺、Shopify Partners/CLI 授权、Admin App、Theme Access 和商家地址；`run` 才开始建立项目和远端资源。项目及原站在首次运行后固定，换店铺或换原站应使用新的 Agent 项目。
+`full-store` 是默认模式。`--project`、`--prompts`、`--template` 可省略；默认分别位于本仓库的 `projects/<store>`、相邻的 `Shopify-Prompts` 和相邻的 `Shopify-Template`。目标项目目录必须为空。`setup` 只读核对店铺、Shopify Partners/CLI 授权、Admin App、Partner Themes 权限、CLI 主题访问及商家地址；`run` 才开始建立项目和远端资源。项目及原站在首次运行后固定，换店铺或换原站应使用新的 Agent 项目。
 
 ## 执行与恢复
 
@@ -101,7 +101,7 @@ npm run resume
 ### 5. 完整建店并在验收通过后上线
 
 ```text
-请使用 Shopify Agent 的 full-store 模式，以 <原站 URL> 为参考，为专用空店铺 <店铺域名.myshopify.com> 在空目录 <新项目绝对路径> 建站。先通过当前操作者的 Shopify Partners 账号申请或确认目标店铺开发权限，再核对店铺身份、Admin App 授权、Theme Access 和商家地址，执行 setup 与 plan 后按顺序运行提示词，并逐步核对产物和状态。只有我明确指定时才使用 SunBrowser。我授权在全部 QA 门槛通过后自动发布主题并开放访问；如果认证、权限或人工验证阻塞，请暂停并报告具体原因，不要声称已上线。
+请使用 Shopify Agent 的 full-store 模式，以 <原站 URL> 为参考，为专用空店铺 <店铺域名.myshopify.com> 在空目录 <新项目绝对路径> 建站。先通过当前操作者的 Shopify Partners 账号申请或确认目标店铺开发权限，再核对店铺身份、Admin App 授权、Partner Themes 权限和商家地址，执行 setup 与 plan 后按顺序运行提示词，并逐步核对产物和状态。只有我明确指定时才使用 SunBrowser。我授权在全部 QA 门槛通过后自动发布主题并开放访问；如果认证、权限或人工验证阻塞，请暂停并报告具体原因，不要声称已上线。
 ```
 
 ## 验证
