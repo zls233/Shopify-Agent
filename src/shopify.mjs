@@ -40,7 +40,6 @@ export function parseThemes(output) {
 }
 
 export async function listThemes(store, { bin = 'shopify', cwd } = {}) {
-  if (!process.env.SHOPIFY_CLI_THEME_TOKEN) throw new Error('SHOPIFY_CLI_THEME_TOKEN is missing; Theme Access is required.');
   return parseThemes(await command(bin, ['theme', 'list', '--store', store, '--json'], { cwd }));
 }
 
